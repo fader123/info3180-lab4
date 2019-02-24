@@ -5,9 +5,10 @@ Werkzeug Documentation:  http://werkzeug.pocoo.org/documentation/
 This file creates your application.
 """
 import os
-from app import app
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from app import app, Allowed_uploads
+from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from werkzeug.utils import secure_filename
+from .forms import UploadForm
 
 
 ###
@@ -26,22 +27,49 @@ def about():
     return render_template('about.html', name="Mary Jane")
 
 
-@app.route('/upload', methods=['POST', 'GET'])
+@app.route('/upload', methods=["POST", "GET"])
 def upload():
     if not session.get('logged_in'):
         abort(401)
 
     # Instantiate your form class
 
+    uploadForm = UploadForm()
+   
     # Validate file upload on submit
     if request.method == 'POST':
+        if uploadForm.validate() == False:
+            flash_errors(uploadForm)
+        else:
         # Get file data and save to your uploads folder
+        
+        
+            f = uploadForm.upload.data
+            filename = secure_filename(f.filename)
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"],filename))
+            flash('File Saved', 'success')
+            return redirect(url_for('home'))
 
-        flash('File Saved', 'success')
-        return redirect(url_for('home'))
+    return render_template('upload.html', uploadForm = uploadForm)
 
-    return render_template('upload.html')
+@app.route('/app/static/uploads')
+def send_images(filename):
+    return send_from_directory('/app/static/uploads', filename)
 
+@app.route('/files')
+def files():
+    image_names=os.listdir('./app/static/uploads')
+    return render_template("files.html", image_names=image_names)
+
+
+
+def get_uploaded_images():
+    upload = []
+    L_file = os.listdir('./app/static/uploads/')
+    for file in L_file:
+            if file.split('.')[-1] in Allowed_uploads:
+                upload.append(file)
+    return upload
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
@@ -102,4 +130,4 @@ def page_not_found(error):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port="8080")
+    app.run(debug=True, host="0.0.0.0", port="8080",env='')
